@@ -142,11 +142,13 @@
     .back-link:hover{ text-decoration:underline; }
 
     .pdf-wrap{
-      background:#525659; border-radius:6px; overflow:hidden;
+      background:#525659; border-radius:6px; overflow:auto;
       height:calc(100vh - 150px); min-height:500px;
       box-shadow:var(--shadow-sm);
+      display:flex; flex-direction:column; align-items:center; gap:14px; padding:14px 0;
     }
-    .pdf-wrap iframe{ width:100%; height:100%; border:none; display:block; }
+    .pdf-wrap canvas{ box-shadow:0 2px 10px rgba(0,0,0,.35); max-width:100%; height:auto; }
+    .pdf-loading{ color:#fff; font-size:14px; padding:40px 0; opacity:.85; }
 
     /* ---- Print styles: only the PDF area prints full-page ---- */
     @media print{
@@ -225,12 +227,10 @@
         </div>
       </div>
 
-      <!-- ===================== PDF VIEW (DESKTOP ONLY): real data source, full-page format ===================== -->
+      <!-- ===================== PDF VIEW: rendered with PDF.js onto <canvas> — works the same on desktop AND mobile/WebView, doesn't depend on the OS/browser having a native PDF viewer ===================== -->
       <div id="pdfPage">
         <button class="back-link" onclick="closePdfViewer()">&larr; Back to Examination Details</button>
-        <div class="pdf-wrap">
-          <iframe id="pdfFrame" title="Document"></iframe>
-        </div>
+        <div class="pdf-wrap" id="pdfWrap"></div>
       </div>
 
     </div>
@@ -254,6 +254,15 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- PDF.js — renders PDFs onto <canvas> ourselves instead of relying on
+     the browser/OS having a built-in PDF viewer. This is what actually
+     fixes mobile: mobile Chrome/Safari and Android WebViews often have
+     NO usable inline PDF renderer (that's the "Open" placeholder box
+     you were seeing) and can also silently block window.open() new-tab
+     workarounds inside WebViews. Canvas rendering works identically
+     everywhere. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <script>
   /* =========================================================
@@ -428,77 +437,84 @@
   });
 
   /* =========================================================
-     PDF VIEWER — FIXED FOR MOBILE
+     PDF VIEWER — FIXED FOR MOBILE (root cause + real fix)
      ---------------------------------------------------------
-     PROBLEM: mobile browsers (Chrome/Safari on Android & iOS)
-     do NOT have a built-in PDF renderer plugin for <iframe>
-     the way desktop Chrome does. So when we set
-     iframe.src = blob:URL on mobile, the browser can't render
-     it inline — it just shows a blank/black box with a generic
-     "Open" button (exactly what your screenshot shows), because
-     the mobile OS is treating it as a file download prompt
-     instead of an embeddable document.
+     REAL ROOT CAUSE: the "Open" placeholder box you're seeing
+     is what mobile browsers AND Android WebViews show whenever
+     they get a PDF blob but have no built-in inline PDF
+     renderer to display it with. Desktop Chrome has one built
+     in, so an <iframe src="blob:..."> just works there. Mobile
+     Chrome/Safari usually don't, and if this student portal is
+     wrapped in an Android app (WebView) — which "Back to
+     Examination Details" still being visible around the empty
+     box suggests — it's even more limited: WebViews typically
+     have NO PDF renderer at all, and window.open()/new-tab
+     tricks often get silently swallowed since there's no real
+     browser tab strip to open into.
 
-     FIX: on mobile, instead of loading the PDF into our own
-     <iframe>, we hand the blob off to a new browser tab. Mobile
-     browsers DO know how to open blob/PDF content correctly in
-     a full tab (using the OS's native PDF viewer) — they just
-     can't do it inside our iframe.
-
-     IMPORTANT DETAIL: because fetching the PDF (api() call) is
-     asynchronous, if we call window.open() only AFTER the fetch
-     resolves, mobile popup-blockers will block it (they only
-     allow window.open when it happens synchronously inside a
-     click handler). So we open a blank tab immediately on click,
-     and once the blob is ready we redirect that tab to it.
-     Desktop behaviour (full-page iframe viewer) is unchanged.
+     REAL FIX: stop depending on the OS/browser to render the
+     PDF at all. We use PDF.js (Mozilla's open-source PDF
+     renderer, loaded above) to draw every page of the PDF onto
+     plain <canvas> elements ourselves, entirely in JavaScript.
+     This looks and behaves identically on desktop, mobile
+     browsers, and inside WebViews, because it no longer relies
+     on any native viewer being present.
      ========================================================= */
-  let currentPdfUrl = null;
-
-  function isMobileDevice(){
-    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  if (window['pdfjsLib']) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
 
-  function openPdf(pdfId){
-    const mobile = isMobileDevice();
+  let pdfRenderToken = 0; // guards against a stale render finishing after the user closed/re-opened
 
-    // Open the tab synchronously (inside the click) so mobile
-    // popup-blockers don't kill it — we fill in the URL later.
-    let newTab = null;
-    if (mobile) {
-      newTab = window.open('', '_blank');
-    }
+  async function openPdf(pdfId){
+    document.getElementById('examListView').classList.add('hidden');
+    document.getElementById('pdfPage').classList.add('open');
+    window.scrollTo(0, 0);
 
-    api(`/api/pdfs/${pdfId}/view`).then(res => res.blob()).then(blob => {
-      if (currentPdfUrl) URL.revokeObjectURL(currentPdfUrl);
-      currentPdfUrl = URL.createObjectURL(blob);
+    const wrap = document.getElementById('pdfWrap');
+    wrap.innerHTML = '<div class="pdf-loading">Loading document…</div>';
 
-      if (mobile) {
-        if (newTab) {
-          newTab.location.href = currentPdfUrl;
-        } else {
-          // popup got blocked anyway (e.g. user has strict popup
-          // settings) — fall back to same-tab navigation
-          window.location.href = currentPdfUrl;
-        }
-      } else {
-        document.getElementById('pdfFrame').src = currentPdfUrl;
-        document.getElementById('examListView').classList.add('hidden');
-        document.getElementById('pdfPage').classList.add('open');
-        window.scrollTo(0, 0);
+    const myToken = ++pdfRenderToken;
+
+    try {
+      const res = await api(`/api/pdfs/${pdfId}/view`);
+      const arrayBuffer = await res.arrayBuffer();
+      if (myToken !== pdfRenderToken) return; // user navigated away already
+
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      if (myToken !== pdfRenderToken) return;
+
+      wrap.innerHTML = '';
+      const containerWidth = wrap.clientWidth - 32; // leave a little side margin
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++){
+        if (myToken !== pdfRenderToken) return;
+        const page = await pdf.getPage(pageNum);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = Math.min(2, (containerWidth > 0 ? containerWidth : 700) / baseViewport.width);
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        wrap.appendChild(canvas);
+
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
       }
-    }).catch(err => {
-      if (newTab) newTab.close();
-      showToast('Could not open document. Please try again.');
+    } catch (err) {
+      if (myToken !== pdfRenderToken) return;
+      wrap.innerHTML = '<div class="pdf-loading">Could not load this document. Please try again.</div>';
       console.error(err);
-    });
+    }
   }
 
   function closePdfViewer(){
+    pdfRenderToken++; // invalidate any render still in progress
     document.getElementById('pdfPage').classList.remove('open');
     document.getElementById('examListView').classList.remove('hidden');
-    document.getElementById('pdfFrame').src = '';
-    if (currentPdfUrl){ URL.revokeObjectURL(currentPdfUrl); currentPdfUrl = null; }
+    document.getElementById('pdfWrap').innerHTML = '';
   }
 
   loadDashboard();

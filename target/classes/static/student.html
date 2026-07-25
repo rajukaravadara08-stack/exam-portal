@@ -128,7 +128,9 @@
 
     /* ---- PDF viewer: full-page inline view, same document source as
        your real backend (fetched via api()/blob below) — no modal or
-       backdrop, opens full page inside the same app shell. ---- */
+       backdrop, opens full page inside the same app shell. Used on
+       DESKTOP only — mobile opens the PDF in a new tab instead (see
+       JS below + notes at bottom of file). ---- */
     #pdfPage{ display:none; }
     #pdfPage.open{ display:block; }
     #examListView.hidden{ display:none; }
@@ -223,7 +225,7 @@
         </div>
       </div>
 
-      <!-- ===================== PDF VIEW: real data source, full-page format ===================== -->
+      <!-- ===================== PDF VIEW (DESKTOP ONLY): real data source, full-page format ===================== -->
       <div id="pdfPage">
         <button class="back-link" onclick="closePdfViewer()">&larr; Back to Examination Details</button>
         <div class="pdf-wrap">
@@ -426,21 +428,69 @@
   });
 
   /* =========================================================
-     PDF VIEWER — real data source (api()/blob fetch, exactly
-     as your real code did it), full-page presentation (as in
-     the mockup you liked) instead of a modal.
+     PDF VIEWER — FIXED FOR MOBILE
+     ---------------------------------------------------------
+     PROBLEM: mobile browsers (Chrome/Safari on Android & iOS)
+     do NOT have a built-in PDF renderer plugin for <iframe>
+     the way desktop Chrome does. So when we set
+     iframe.src = blob:URL on mobile, the browser can't render
+     it inline — it just shows a blank/black box with a generic
+     "Open" button (exactly what your screenshot shows), because
+     the mobile OS is treating it as a file download prompt
+     instead of an embeddable document.
+
+     FIX: on mobile, instead of loading the PDF into our own
+     <iframe>, we hand the blob off to a new browser tab. Mobile
+     browsers DO know how to open blob/PDF content correctly in
+     a full tab (using the OS's native PDF viewer) — they just
+     can't do it inside our iframe.
+
+     IMPORTANT DETAIL: because fetching the PDF (api() call) is
+     asynchronous, if we call window.open() only AFTER the fetch
+     resolves, mobile popup-blockers will block it (they only
+     allow window.open when it happens synchronously inside a
+     click handler). So we open a blank tab immediately on click,
+     and once the blob is ready we redirect that tab to it.
+     Desktop behaviour (full-page iframe viewer) is unchanged.
      ========================================================= */
   let currentPdfUrl = null;
 
+  function isMobileDevice(){
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+  }
+
   function openPdf(pdfId){
+    const mobile = isMobileDevice();
+
+    // Open the tab synchronously (inside the click) so mobile
+    // popup-blockers don't kill it — we fill in the URL later.
+    let newTab = null;
+    if (mobile) {
+      newTab = window.open('', '_blank');
+    }
+
     api(`/api/pdfs/${pdfId}/view`).then(res => res.blob()).then(blob => {
       if (currentPdfUrl) URL.revokeObjectURL(currentPdfUrl);
       currentPdfUrl = URL.createObjectURL(blob);
-      document.getElementById('pdfFrame').src = currentPdfUrl;
 
-      document.getElementById('examListView').classList.add('hidden');
-      document.getElementById('pdfPage').classList.add('open');
-      window.scrollTo(0, 0);
+      if (mobile) {
+        if (newTab) {
+          newTab.location.href = currentPdfUrl;
+        } else {
+          // popup got blocked anyway (e.g. user has strict popup
+          // settings) — fall back to same-tab navigation
+          window.location.href = currentPdfUrl;
+        }
+      } else {
+        document.getElementById('pdfFrame').src = currentPdfUrl;
+        document.getElementById('examListView').classList.add('hidden');
+        document.getElementById('pdfPage').classList.add('open');
+        window.scrollTo(0, 0);
+      }
+    }).catch(err => {
+      if (newTab) newTab.close();
+      showToast('Could not open document. Please try again.');
+      console.error(err);
     });
   }
 
