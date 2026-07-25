@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal Login</title>
+<style>
+  :root{
+    --ink:#1b2a4a; --ink-soft:#5b6b83; --canvas:#f0f1f3; --line:#dfe4ec;
+    --accent:#1f9d7c; --accent-2:#17805f; --accent-soft:#e6f7f1;
+    --blue:#1f6fb2; --blue-2:#175a92; --white:#ffffff; --error:#c0473a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI', Roboto, Arial, sans-serif;
+    background:#c9cbcf;
+    min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:40px 20px;
+    position:relative; overflow-x:hidden;
+  }
+  /* subtle textured backdrop, generic architectural silhouette (not any real institution's artwork) */
+  body::before{
+    content:''; position:fixed; inset:0; z-index:0;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.015) 0, rgba(0,0,0,0.015) 2px, transparent 2px, transparent 6px);
+  }
+  .monument{
+    position:fixed; left:0; bottom:0; z-index:0; opacity:0.55; pointer-events:none;
+    width:340px; height:auto;
+  }
+  .top-header{
+    position:relative; z-index:2; text-align:center; margin-bottom:26px; color:var(--ink);
+  }
+  .seal{
+    width:96px; height:96px; border-radius:50%; margin:0 auto 10px;
+    background:radial-gradient(circle at 50% 40%, #f4f1e8 0%, #e7e1cc 100%);
+    border:3px solid #8a7b4f; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,0.25);
+  }
+  .seal svg{width:52px; height:52px;}
+  .top-header h1{font-size:20px; font-weight:600; color:#22314f; letter-spacing:.01em;}
+  .top-header .estd{font-size:12.5px; color:#5b6b83; margin-top:4px; font-weight:600;}
+  .top-header .motto{font-size:13px; color:#3a4a68; margin-top:2px; font-family:'Segoe UI',sans-serif;}
+
+  .card{
+    background:var(--white); width:100%; max-width:400px; border-radius:6px;
+    box-shadow:0 10px 32px rgba(0,0,0,0.28); overflow:hidden; position:relative; z-index:2;
+  }
+  .card-body{padding:30px 32px 32px;}
+  .card-body h2{font-size:22px; font-weight:600; color:var(--ink); margin-bottom:18px; border-bottom:1px solid var(--line); padding-bottom:16px;}
+  label{display:block; font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:6px;}
+  .field{margin-bottom:16px;}
+  input[type=text], input[type=password]{
+    width:100%; padding:11px 13px; border:1.5px solid var(--line); border-radius:5px;
+    font-family:inherit; font-size:14px; color:var(--ink); background:var(--canvas); outline:none;
+    transition:all .15s ease;
+  }
+  input:focus{border-color:var(--blue); background:#fff; box-shadow:0 0 0 3px rgba(31,111,178,0.12);}
+  .pwd-wrap{position:relative;}
+  .pwd-wrap input{padding-right:40px;}
+  .pwd-eye{
+    position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer;
+    color:var(--ink-soft); font-size:16px; user-select:none; background:none; border:none;
+  }
+  .captcha-row{display:flex; gap:10px; align-items:center; margin-bottom:14px;}
+  .captcha-display{
+    border:1.5px solid var(--line); border-radius:5px; background:var(--canvas);
+    width:130px; height:44px; display:flex; align-items:center; justify-content:center;
+    font-family:'Consolas', monospace; font-size:19px; font-weight:700; letter-spacing:2px;
+    color:var(--ink); user-select:none;
+  }
+  .captcha-display img{width:100%; height:100%; object-fit:fill; border-radius:5px;}
+  .refresh-btn{
+    background:var(--canvas); border:1.5px solid var(--line); border-radius:5px; width:44px; height:44px;
+    font-size:16px; cursor:pointer; color:var(--ink-soft); flex-shrink:0; transition:all .15s ease;
+  }
+  .refresh-btn:hover{border-color:var(--blue); color:var(--blue); background:#eef4fa;}
+  .error-msg{
+    display:none; background:#fbeae2; color:var(--error); font-size:12.5px; padding:10px 13px;
+    border-radius:5px; margin-bottom:16px; border:1px solid rgba(192,71,58,0.25);
+  }
+  .error-msg.show{display:block;}
+  .submit-btn{
+    width:100%; padding:13px; border:none; border-radius:24px;
+    background:var(--accent);
+    color:#fff; font-weight:700; font-size:15px; cursor:pointer;
+    box-shadow:0 4px 12px rgba(31,157,124,0.35);
+    transition:background .12s ease;
+    margin-bottom:20px;
+  }
+  .submit-btn:hover{background:var(--accent-2);}
+  .submit-btn:disabled{opacity:.6; cursor:not-allowed;}
+  .link-row{display:flex; gap:10px; justify-content:center; flex-wrap:wrap;}
+  .link-btn{
+    flex:1; min-width:150px; padding:11px 14px; border:none; border-radius:5px;
+    background:var(--blue); color:#fff; font-weight:600; font-size:13px; cursor:pointer;
+    transition:background .12s ease; text-align:center;
+  }
+  .link-btn:hover{background:var(--blue-2);}
+</style>
+</head>
+<body>
+
+<svg class="monument" viewBox="0 0 300 400" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#8b8d92" opacity="0.6">
+    <rect x="40" y="230" width="220" height="170"/>
+    <rect x="60" y="160" width="35" height="70"/>
+    <rect x="205" y="160" width="35" height="70"/>
+    <polygon points="60,160 77,120 95,160"/>
+    <polygon points="205,160 222,120 240,160"/>
+    <rect x="120" y="60" width="60" height="170"/>
+    <polygon points="120,60 150,0 180,60"/>
+    <circle cx="150" cy="20" r="5"/>
+    <rect x="100" y="280" width="24" height="60"/>
+    <rect x="176" y="280" width="24" height="60"/>
+    <rect x="138" y="280" width="24" height="80"/>
+  </g>
+</svg>
+
+<div style="position:relative; z-index:2; width:100%; max-width:400px; margin:0 auto;">
+  <div class="top-header">
+    <div class="seal">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L2 8l10 6 10-6-10-6z" stroke="#7a6a3a" stroke-width="1.4" fill="#c9a95a" fill-opacity="0.35"/>
+        <path d="M2 8v7l10 6 10-6V8" stroke="#7a6a3a" stroke-width="1.4"/>
+        <path d="M12 14v6" stroke="#7a6a3a" stroke-width="1.4"/>
+      </svg>
+    </div>
+    <h1>Institute Examination Portal</h1>
+    <div class="estd">Established portal for academic records</div>
+    <div class="motto">Truth · Goodness · Beauty</div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h2>Sign In</h2>
+      <div class="error-msg" id="errorMsg"></div>
+      <form id="loginForm">
+        <div class="field">
+          <label for="uid">Username</label>
+          <input type="text" id="uid" placeholder="Your username" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <div class="pwd-wrap">
+            <input type="password" id="pwd" placeholder="Password" autocomplete="current-password" required>
+            <button type="button" class="pwd-eye" onclick="togglePwd()" id="pwdEye">👁</button>
+          </div>
+        </div>
+        <div class="captcha-row">
+          <div class="captcha-display" id="captchaWrap"><img id="captchaImg" alt="captcha"></div>
+          <button type="button" class="refresh-btn" onclick="loadCaptcha()" title="Refresh code">⟳</button>
+        </div>
+        <div class="field">
+          <input type="text" id="captchaInput" placeholder="Captcha" required>
+        </div>
+        <button type="submit" class="submit-btn" id="submitBtn">Sign In</button>
+      </form>
+      <div class="link-row">
+        <button type="button" class="link-btn" onclick="showToast('Time table viewing is not available in this portal yet.')">View Exam Time-Table</button>
+        <button type="button" class="link-btn" onclick="showToast('Please contact the examination office to reset your password.')">Reset Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" style="position:fixed;bottom:26px;right:26px;background:#1b2a4a;color:#fff;padding:13px 20px;border-radius:5px;font-size:13.5px;box-shadow:0 20px 50px rgba(16,28,51,0.28);opacity:0;transform:translateY(12px);transition:all .22s cubic-bezier(.2,.8,.2,1);z-index:400;max-width:340px;"></div>
+
+<script>
+let captchaId = null;
+
+function togglePwd(){
+  const f = document.getElementById('pwd');
+  f.type = f.type === 'password' ? 'text' : 'password';
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.transform = 'translateY(0)';
+  setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(12px)'; }, 3000);
+}
+
+async function loadCaptcha(){
+  const res = await fetch('/api/auth/captcha');
+  const data = await res.json();
+  captchaId = data.id;
+  const blob = new Blob([data.svg], { type: 'image/svg+xml' });
+  document.getElementById('captchaImg').src = URL.createObjectURL(blob);
+}
+loadCaptcha();
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const errorEl = document.getElementById('errorMsg');
+  errorEl.classList.remove('show');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+
+  const body = {
+    userId: document.getElementById('uid').value.trim(),
+    password: document.getElementById('pwd').value,
+    captchaId: captchaId,
+    captchaText: document.getElementById('captchaInput').value.trim()
+  };
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorEl.textContent = data.error || 'Login failed.';
+      errorEl.classList.add('show');
+      loadCaptcha();
+      document.getElementById('captchaInput').value = '';
+      return;
+    }
+
+    sessionStorage.setItem('token', data.token);
+    sessionStorage.setItem('userId', data.userId);
+    sessionStorage.setItem('role', data.role);
+    sessionStorage.setItem('displayName', data.displayName);
+
+    window.location.href = data.role === 'ADMIN' ? '/admin.html' : '/student.html';
+  } catch (err) {
+    errorEl.textContent = 'Could not reach the server. Is the backend running?';
+    errorEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sign In';
+  }
+});
+</script>
+
+</body>
+</html>

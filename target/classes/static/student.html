@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Examination Details</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* ---- Examination Details table: match reference screenshot exactly ---- */
+    .ledger-head, .row{
+      display:grid;
+      grid-template-columns: 70px 230px 190px 190px 190px 190px 140px 150px 180px 140px 110px 130px 140px 140px 110px 110px 130px 90px;
+    }
+    .content{ padding-top:0; }
+    .page-head{
+      background:#fff; margin:0 -32px 0; padding:22px 32px 18px; border-top:4px solid #8cddcd;
+      border-bottom:1px solid #e9e9e9;
+    }
+    h1{ font-size:24px; font-weight:500; color:#212529; margin:0; }
+    .ledger-wrap{ border:1px solid #e9e9e9; box-shadow:none; border-radius:0; margin-top:0; overflow-x:auto; background:#fff; }
+    .ledger-head{
+      background:#fff; color:#212529; font-size:15px; font-weight:700; border-bottom:2px solid #dfe1e5;
+    }
+    .ledger-head div{ padding:16px 18px; border-right:none; }
+    .row{ border-top:1px solid #eceff2; }
+    .row:nth-child(odd){ background:#fff; }
+    .row:nth-child(even){ background:#f2f2f2; }
+    .row:hover{ background:#eaf4fc; }
+    .row .cell{ padding:16px 18px; border-right:none; font-size:14px; }
+    .ledger-head div:nth-child(1), .row .cell:nth-child(1),
+    .ledger-head div:nth-child(3), .row .cell:nth-child(3),
+    .ledger-head div:nth-child(4), .row .cell:nth-child(4),
+    .ledger-head div:nth-child(5), .row .cell:nth-child(5),
+    .ledger-head div:nth-child(6), .row .cell:nth-child(6){ text-align:center; }
+    .row .cell:nth-child(3), .row .cell:nth-child(4), .row .cell:nth-child(5), .row .cell:nth-child(6){
+      display:flex; justify-content:center;
+    }
+    .pill-btn{ border:1px solid transparent; border-radius:5px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .pill-btn.btn-ghost{
+      background:#3498db; border-color:#3498db; min-width:150px; justify-content:center;
+      padding:11px 18px; font-size:13.5px; font-weight:600; border-radius:5px; box-shadow:none; color:#fff;
+    }
+    .pill-btn.btn-ghost:hover{ background:#2f89c5; border-color:#2f89c5; }
+    .btn-ghost:disabled{ background:#3498db; border-color:#3498db; color:#fff; opacity:1; cursor:default; }
+    .btn-ghost:disabled:hover{ background:#3498db; border-color:#3498db; }
+
+    /* Sidebar items: flat rows matching the reference portal theme
+       (dark navy panel, plain icon+label rows, active row gets a
+       solid darker highlight bar — not a pill/button) */
+    .sidebar nav ul{ padding:6px 0 20px; display:flex; flex-direction:column; gap:1px; list-style:none; margin:0; }
+    .sidebar nav li.sb-item{
+      color:#dbe2ee;
+      padding:12px 20px;
+      display:flex; align-items:center; gap:13px;
+      font-size:14px; cursor:pointer; white-space:nowrap;
+      border-left:3px solid transparent;
+      transition:background .12s ease, color .12s ease;
+    }
+    .sidebar nav li.sb-item:hover{ background:#46608c; color:#fff; }
+    .sidebar nav li.sb-item.active{
+      background:#253352; color:#fff; font-weight:600;
+      border-left:3px solid #8cddcd;
+    }
+    .sidebar nav li.sb-item .ico{ width:17px; height:17px; flex:none; opacity:.95; }
+    .sidebar nav li.sb-item .ico svg{ width:17px; height:17px; display:block; }
+
+    /* ---- Icon-rail sidebar: ALWAYS visible (icon-only rail when
+       collapsed), expands to show labels on toggle. It sits in normal
+       flex flow next to the content, so the page reflows/adjusts to
+       its width instead of floating over the content as an overlay. ---- */
+    .sidebar{
+      flex:none; width:52px; background:#3b4d75; overflow-x:hidden; overflow-y:auto;
+      transition:width .22s cubic-bezier(.2,.8,.2,1);
+      height:calc(100vh - 52px);
+      position:sticky; top:52px;
+    }
+    .sidebar.open{ width:250px; }
+    .prn-box{ display:none; }              /* PRN shown only when the rail is expanded */
+    .sidebar.open .prn-box{ display:block; }
+    .prn-box{ background:#233047; color:#fff; padding:11px 16px; font-size:13px; font-weight:700; border-bottom:1px solid rgba(255,255,255,.1); }
+
+    /* icon-only state: center icons, hide labels, no per-item box shape */
+    .sidebar:not(.open) .sb-item{ justify-content:center; padding:13px 0; }
+    .sidebar:not(.open) .sb-item .label{ display:none; }
+    .sidebar.open .sb-item{ justify-content:flex-start; }
+
+    .body-row{ display:flex; align-items:flex-start; }
+    .main-col{ flex:1; min-width:0; }
+
+    /* ---- Topbar ---- */
+    .topbar{
+      display:flex; align-items:center; gap:14px; background:#3b4d75; color:#fff;
+      padding:10px 24px; position:sticky; top:0; z-index:400; height:52px;
+    }
+    .topbar .spacer{ flex:1; }
+    .topbar .datetime{ font-size:13px; opacity:.9; }
+    .topbar .user{ display:flex; align-items:center; gap:8px; font-size:13px; background:none; border:none; color:#fff; cursor:pointer; padding:4px 6px; border-radius:4px; }
+    .topbar .user:hover{ background:rgba(255,255,255,.1); }
+    .topbar .user img{ width:30px; height:30px; border-radius:50%; }
+    .topbar .user .caret{ width:14px; height:14px; transition:transform .15s ease; }
+    .user-wrap{ position:relative; }
+    .user-wrap.open .caret{ transform:rotate(180deg); }
+    .user-menu{
+      position:absolute; top:calc(100% + 8px); right:0; min-width:160px;
+      background:#fff; color:var(--ink); border-radius:6px; box-shadow:var(--shadow-lg);
+      padding:6px; display:none; z-index:500;
+    }
+    .user-wrap.open .user-menu{ display:block; }
+    .user-menu-item{
+      display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+      background:none; border:none; padding:10px 12px; border-radius:4px;
+      font-size:13.5px; font-weight:600; color:#c0392b; cursor:pointer;
+    }
+    .user-menu-item:hover{ background:#fdecea; }
+    .user-menu-item svg{ width:16px; height:16px; flex:none; }
+
+    .sb-toggle{
+      width:36px; height:36px; border-radius:4px; border:1px solid var(--line-strong);
+      background:var(--surface); color:var(--ink); cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center;
+      transition:all .15s ease;
+    }
+    .sb-toggle:hover{ border-color:var(--accent-2); color:var(--accent-2); background:var(--accent-soft); }
+    .sb-toggle svg{ width:20px; height:20px; }
+
+
+    .content{ padding:24px 32px 48px; max-width:1400px; }
+
+    /* ---- PDF viewer: full-page inline view, same document source as
+       your real backend (fetched via api()/blob below) — no modal or
+       backdrop, opens full page inside the same app shell. ---- */
+    #pdfPage{ display:none; }
+    #pdfPage.open{ display:block; }
+    #examListView.hidden{ display:none; }
+
+    .back-link{
+      display:inline-flex; align-items:center; gap:6px; font-size:13.5px; color:var(--accent-2);
+      cursor:pointer; margin-bottom:16px; background:none; border:none; padding:0; font-weight:600;
+    }
+    .back-link:hover{ text-decoration:underline; }
+
+    .pdf-wrap{
+      background:#525659; border-radius:6px; overflow:hidden;
+      height:calc(100vh - 150px); min-height:500px;
+      box-shadow:var(--shadow-sm);
+    }
+    .pdf-wrap iframe{ width:100%; height:100%; border:none; display:block; }
+
+    /* ---- Print styles: only the PDF area prints full-page ---- */
+    @media print{
+      .sidebar, .topbar, .page-head, .back-link{ display:none !important; }
+      body{ background:#fff; }
+      .content{ padding:0; max-width:none; }
+      .pdf-wrap{ height:100vh; border-radius:0; box-shadow:none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <button class="sb-toggle" id="sbToggle" aria-label="Toggle menu">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="spacer"></div>
+  <div class="datetime" id="topDatetime"></div>
+
+  <div class="user-wrap" id="userWrap">
+    <button class="user" id="userToggle" type="button">
+      <img src="/img/avatar.png" alt="" onerror="this.style.display='none'">
+      <span id="userName">Student</span>
+      <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="user-menu" id="userMenu">
+      <button class="user-menu-item" id="logoutBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        Logout
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="body-row">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="prn-box">PRN No: <span id="sidebarPrn">...</span></div>
+    <nav>
+      <ul>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg></span><span class="label">Dashboard</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.5" r="3.5"/><path d="M4.5 20c1.4-3.6 4.3-5.5 7.5-5.5s6.1 1.9 7.5 5.5"/></svg></span><span class="label">Student Profile</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4M8 12h8M8 16h8M8 8h3"/></svg></span><span class="label">Paper List</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="label">Request Status</span></li>
+        <li class="sb-item active"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg></span><span class="label">Examination Details</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4"/><path d="m9.5 14.5 1.5 1.5 3-3.5"/></svg></span><span class="label">Request For Certificate</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg></span><span class="label">Download Certificate</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V4"/><path d="M6 4h11l-2.5 3.5L17 11H6"/></svg></span><span class="label">Cancel Admission</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V10M12 20V4M19 20v-7"/></svg></span><span class="label">Progression</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="4.5"/><path d="m8.2 12.5-1.7 7 5.5-2.8 5.5 2.8-1.7-7"/></svg></span><span class="label">Achievement</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10v18l-5-3.5L7 21Z"/></svg></span><span class="label">Scholarship</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9.5 12 5l10 4.5-10 4.5-10-4.5Z"/><path d="M6 11.7v4.3c0 1.3 2.7 2.5 6 2.5s6-1.2 6-2.5v-4.3"/><path d="M22 9.5v5.5"/></svg></span><span class="label">Convocation</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="4.5"/><path d="m8.2 12.5-1.7 7 5.5-2.8 5.5 2.8-1.7-7"/></svg></span><span class="label">Sport Certificate</span></li>
+        <li class="sb-item"><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8.5a15 15 0 0 1 20 0"/><path d="M5.5 12.3a10 10 0 0 1 13 0"/><path d="M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none"/></svg></span><span class="label">Wifi Registration</span></li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main class="main-col">
+    <div class="content">
+
+      <!-- ===================== EXAMINATION DETAILS VIEW (real, data-driven) ===================== -->
+      <div id="examListView">
+        <div class="page-head"><h1>Examination Details</h1></div>
+
+        <div class="ledger-wrap">
+          <div class="ledger" id="ledger">
+            <div class="ledger-head">
+              <div>S.No</div><div>Semester Name</div><div>Action</div><div>Hall Ticket</div><div>Result</div>
+              <div>TimeTable</div><div>PRN</div><div>Exam Event</div><div>Faculty Name</div>
+              <div>Appearance Type</div><div>Form No</div><div>Exam Fee Amount</div>
+              <div>Exam Fee Start Date</div><div>Exam Fee End Date</div><div>Inward</div>
+              <div>Seat Number</div><div>Result Status</div><div>Marks</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================== PDF VIEW: real data source, full-page format ===================== -->
+      <div id="pdfPage">
+        <button class="back-link" onclick="closePdfViewer()">&larr; Back to Examination Details</button>
+        <div class="pdf-wrap">
+          <iframe id="pdfFrame" title="Document"></iframe>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<!-- ===== VIEW MARKS DRAWER (unchanged from your real code) ===== -->
+<div class="modal-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+      <div class="eyebrow">SUBJECTS &amp; MARKS</div>
+      <h2 id="drawerTitle">Semester record</h2>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+    <div class="drawer-foot">
+      <button class="pill-btn btn-ghost" onclick="closeDrawer()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  /* =========================================================
+     AUTH — same as your real code, unchanged
+     ========================================================= */
+  const token = sessionStorage.getItem('token');
+  const role = sessionStorage.getItem('role');
+  if (!token || role !== 'STUDENT') window.location.href = '/login.html';
+
+  const studentPrn = sessionStorage.getItem('userId');
+  document.getElementById('sidebarPrn').textContent = studentPrn;
+  document.getElementById('userName').textContent = sessionStorage.getItem('displayName') || 'Student';
+  document.getElementById('topDatetime').textContent = 'Date and Time: ' + new Date().toLocaleString();
+
+  function logout(){
+    sessionStorage.clear();
+    window.location.href = '/login.html';
+  }
+  function showToast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  async function api(path, opts = {}){
+    const res = await fetch(path, {
+      ...opts,
+      headers: { ...(opts.headers || {}), 'Authorization': 'Bearer ' + token }
+    });
+    if (res.status === 401){ logout(); throw new Error('Session expired'); }
+    return res;
+  }
+
+  /* =========================================================
+     USER MENU (logout dropdown) — icon design from the mockup,
+     wired to the real logout() above
+     ========================================================= */
+  const userWrap   = document.getElementById('userWrap');
+  const userToggle = document.getElementById('userToggle');
+  const logoutBtn  = document.getElementById('logoutBtn');
+
+  userToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userWrap.classList.toggle('open');
+  });
+  logoutBtn.addEventListener('click', () => {
+    logout();
+  });
+  document.addEventListener('click', (e) => {
+    if (userWrap.classList.contains('open') && !userWrap.contains(e.target)) {
+      userWrap.classList.remove('open');
+    }
+  });
+
+  /* =========================================================
+     ICON-RAIL SIDEBAR — expand/collapse, tap-anywhere-closes
+     (same behavior/markup style as the mockup you liked)
+     ========================================================= */
+  const sidebar = document.getElementById('sidebar');
+  const toggle  = document.getElementById('sbToggle');
+
+  toggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    sidebar.classList.toggle('open');
+  });
+
+  document.querySelectorAll('.sidebar nav li').forEach(li => {
+    li.addEventListener('click', () => {
+      if (!li.classList.contains('active')) {
+        showToast(li.querySelector('.label').textContent.trim() + ' is not available in this portal yet.');
+      }
+      sidebar.classList.remove('open');
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!sidebar.classList.contains('open')) return;
+    if (sidebar.contains(e.target) || toggle.contains(e.target)) return;
+    sidebar.classList.remove('open');
+  });
+
+  /* =========================================================
+     DATA — loadDashboard/renderRecords/marks drawer, unchanged
+     from your real code
+     ========================================================= */
+  let allDocs = [];
+
+  async function loadDashboard(){
+    const [recRes, pdfRes] = await Promise.all([ api('/api/records'), api('/api/pdfs') ]);
+    const records = await recRes.json();
+    allDocs = await pdfRes.json();
+    renderRecords(records);
+  }
+
+  function docFor(recordId, type){
+    return allDocs.find(d => d.recordId === recordId && d.docType === type);
+  }
+
+  function renderRecords(records){
+    const ledger = document.getElementById('ledger');
+    const head = ledger.querySelector('.ledger-head');
+    ledger.innerHTML = '';
+    ledger.appendChild(head);
+
+    records.forEach((r, i) => {
+      const appBadge = r.appearanceType === 'Fresher' ? 'badge-fresher' : 'badge-repeater';
+      const statusBadge = r.resultStatus === 'Complete' ? 'badge-complete' : 'badge-incomplete';
+      const hallTicket = docFor(r.id, 'Hall Ticket');
+      const timetable = docFor(r.id, 'Timetable');
+      const resultDoc = docFor(r.id, 'Result');
+
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <div class="cell sno">${String(i+1)}</div>
+        <div class="cell">
+          <div class="sem-name">${r.semesterName}</div>
+          <div class="meta">${r.academicYear}</div>
+        </div>
+        <div class="cell"><button class="pill-btn btn-ghost" disabled title="Not published yet">Internal Marks</button></div>
+        <div class="cell">${hallTicket ? `<button class="pill-btn btn-ghost" onclick="openPdf(${hallTicket.id})">Hall Ticket</button>` : `<button class="pill-btn btn-ghost" disabled title="Not uploaded yet">Hall Ticket</button>`}</div>
+        <div class="cell">${resultDoc ? `<button class="pill-btn btn-ghost" onclick="openPdf(${resultDoc.id})">Result</button>` : `<button class="pill-btn btn-ghost" disabled title="Not published yet">Result</button>`}</div>
+        <div class="cell">${timetable ? `<button class="pill-btn btn-ghost" onclick="openPdf(${timetable.id})">Exam Time Table</button>` : `<button class="pill-btn btn-ghost" disabled title="Not released yet">Exam Time Table</button>`}</div>
+        <div class="cell mono">${studentPrn}</div>
+        <div class="cell mono">${r.examEvent}</div>
+        <div class="cell">${r.facultyName}</div>
+        <div class="cell"><span class="badge ${appBadge}">${r.appearanceType}</span></div>
+        <div class="cell mono">${r.formNo}</div>
+        <div class="cell mono">${r.examFeeAmount}</div>
+        <div class="cell mono">${r.examFeeStartDate}</div>
+        <div class="cell mono">${r.examFeeEndDate}</div>
+        <div class="cell mono">${r.inward}</div>
+        <div class="cell mono">${r.seatNumber}</div>
+        <div class="cell"><span class="badge ${statusBadge}">${r.resultStatus}</span></div>
+        <div class="cell"><button class="pill-btn btn-ghost" onclick="openMarksDrawer(${r.id})">View</button></div>
+      `;
+      ledger.appendChild(row);
+    });
+
+    window.__records = records;
+  }
+
+  function parseSubjects(json){
+    try { return JSON.parse(json || '[]'); } catch { return []; }
+  }
+
+  function openMarksDrawer(recordId){
+    const r = window.__records.find(rec => rec.id === recordId);
+    if (!r) return;
+    const subjects = parseSubjects(r.subjectsJson);
+
+    document.getElementById('drawerTitle').textContent = r.semesterName;
+    document.getElementById('drawerBody').innerHTML = `
+      <div class="f-group" style="margin-bottom:18px;"><span class="f-label">SGPA</span><span class="f-value">${r.sgpa || '—'}</span></div>
+      <table class="subj-table">
+        <thead><tr><th>Subject</th><th>Marks</th></tr></thead>
+        <tbody>
+          ${subjects.length ? subjects.map(s => `<tr><td>${s[0]}</td><td>${s[1]}</td></tr>`).join('')
+            : `<tr><td colspan="2" class="empty-row">No subjects recorded yet.</td></tr>`}
+        </tbody>
+      </table>
+    `;
+    document.getElementById('drawerOverlay').classList.add('show');
+  }
+
+  function closeDrawer(){
+    document.getElementById('drawerOverlay').classList.remove('show');
+  }
+  document.getElementById('drawerOverlay').addEventListener('click', e => {
+    if (e.target.id === 'drawerOverlay') closeDrawer();
+  });
+
+  /* =========================================================
+     PDF VIEWER — real data source (api()/blob fetch, exactly
+     as your real code did it), full-page presentation (as in
+     the mockup you liked) instead of a modal.
+     ========================================================= */
+  let currentPdfUrl = null;
+
+  function openPdf(pdfId){
+    api(`/api/pdfs/${pdfId}/view`).then(res => res.blob()).then(blob => {
+      if (currentPdfUrl) URL.revokeObjectURL(currentPdfUrl);
+      currentPdfUrl = URL.createObjectURL(blob);
+      document.getElementById('pdfFrame').src = currentPdfUrl;
+
+      document.getElementById('examListView').classList.add('hidden');
+      document.getElementById('pdfPage').classList.add('open');
+      window.scrollTo(0, 0);
+    });
+  }
+
+  function closePdfViewer(){
+    document.getElementById('pdfPage').classList.remove('open');
+    document.getElementById('examListView').classList.remove('hidden');
+    document.getElementById('pdfFrame').src = '';
+    if (currentPdfUrl){ URL.revokeObjectURL(currentPdfUrl); currentPdfUrl = null; }
+  }
+
+  loadDashboard();
+</script>
+
+</body>
+</html>

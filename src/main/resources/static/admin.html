@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Panel — Examination Records</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+<style>
+  .ledger-head, .row.record-row{
+    grid-template-columns: 52px 220px 130px 100px 110px 130px 90px 90px 100px 90px 110px;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="prn-box">
+      <span class="prn-label">Signed in as</span>
+      <span class="prn-value">Administrator</span>
+    </div>
+    <nav>
+      <ul>
+        <li class="active"><span class="dot"></span>Examination Records</li>
+        <li><span class="dot"></span>PDF Library</li>
+        <li><span class="dot"></span>User Accounts</li>
+      </ul>
+    </nav>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <span class="dt" id="liveDt"></span>
+      <button class="btn-outline" onclick="logout()">Log Out</button>
+      <div class="user">
+        <div class="avatar">A</div>
+        <span class="uname">Admin</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Admin Panel</div>
+          <h1>Examination Records</h1>
+          <p class="sub">Every student in one place. Click a card to filter, then use View to inspect a record or Edit to change it.</p>
+        </div>
+        <button class="primary-btn" onclick="openCreateDrawer()">+ Add Exam Record</button>
+      </div>
+
+      <!-- ===== ALL STUDENTS AT A GLANCE ===== -->
+      <div class="students-strip" id="studentsStrip"></div>
+
+      <div class="filter-bar">
+        <span class="mono">Showing:</span>
+        <select id="studentFilter" onchange="applyFilter()">
+          <option value="">All students</option>
+        </select>
+      </div>
+
+      <div class="ledger-wrap">
+        <div class="ledger" id="ledger">
+          <div class="ledger-head">
+            <div>No.</div><div>Semester</div><div>Student (PRN)</div><div>Year</div>
+            <div>Exam Event</div><div>Seat No</div><div>Appearance</div><div>Status</div>
+            <div>SGPA</div><div>Fee</div><div>Actions</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PDF LIBRARY ===== -->
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>PDF Library</h2>
+            <p>Upload, replace or remove hall tickets, results and timetables for any student. Students only ever see what's uploaded here.</p>
+          </div>
+        </div>
+        <div class="form-inline">
+          <div class="fld">
+            <label>Student ID (PRN)</label>
+            <input type="text" id="pdfStudentId" placeholder="8022041145" style="width:140px;">
+          </div>
+          <div class="fld">
+            <label>Linked Record</label>
+            <select id="pdfRecordId" style="width:250px;"></select>
+          </div>
+          <div class="fld">
+            <label>Document Type</label>
+            <select id="pdfDocType">
+              <option>Hall Ticket</option>
+              <option>Result</option>
+              <option>Timetable</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="fld">
+            <label>PDF File</label>
+            <input type="file" id="pdfFile" accept="application/pdf">
+          </div>
+          <button class="primary-btn" onclick="uploadPdf()">Upload</button>
+        </div>
+        <table class="simple">
+          <thead><tr><th>Student</th><th>Document Type</th><th>Filename</th><th>Uploaded</th><th></th></tr></thead>
+          <tbody id="pdfTableBody"></tbody>
+        </table>
+        <div class="note">A student only sees a Result / Hall Ticket / Timetable button light up once you've uploaded that document for their record — nothing is shown or generated automatically until you add it here.</div>
+      </div>
+
+      <!-- ===== USER ACCOUNTS ===== -->
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>User Accounts</h2>
+            <p>Add or remove login accounts. Same login page works for both admins and students.</p>
+          </div>
+        </div>
+        <div class="form-inline">
+          <div class="fld"><label>User ID</label><input type="text" id="newUserId" placeholder="e.g. 8022041200" style="width:150px;"></div>
+          <div class="fld"><label>Display Name</label><input type="text" id="newUserName" placeholder="Full name" style="width:170px;"></div>
+          <div class="fld"><label>Password</label><input type="text" id="newUserPass" placeholder="Set a password" style="width:150px;"></div>
+          <div class="fld">
+            <label>Role</label>
+            <select id="newUserRole">
+              <option value="STUDENT">Student</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+          <button class="primary-btn" onclick="createUser()">Add User</button>
+        </div>
+        <table class="simple">
+          <thead><tr><th>User ID</th><th>Name</th><th>Role</th><th></th></tr></thead>
+          <tbody id="userTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===== VIEW / EDIT DRAWER ===== -->
+<div class="modal-overlay" id="drawerOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <button class="drawer-close" onclick="closeDrawer()">✕</button>
+      <div class="eyebrow" id="drawerEyebrow">RECORD</div>
+      <h2 id="drawerTitle">Semester record</h2>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+    <div class="drawer-foot" id="drawerFoot"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const token = sessionStorage.getItem('token');
+const role = sessionStorage.getItem('role');
+if (!token || role !== 'ADMIN') window.location.href = '/login.html';
+
+document.getElementById('liveDt').textContent = 'Date and Time: ' + new Date().toLocaleString();
+
+function logout(){ sessionStorage.clear(); window.location.href = '/login.html'; }
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+async function api(path, opts = {}){
+  const res = await fetch(path, { ...opts, headers: { ...(opts.headers||{}), 'Authorization': 'Bearer ' + token } });
+  if (res.status === 401){ logout(); throw new Error('Session expired'); }
+  return res;
+}
+async function apiJson(path, method, body){
+  return api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+
+// ---------------- State ----------------
+let records = [];
+let users = [];
+let activeStudentFilter = "";
+
+async function loadAll(){
+  const [recRes, userRes] = await Promise.all([ api('/api/records/admin/all'), api('/api/users') ]);
+  records = await recRes.json();
+  users = await userRes.json();
+  renderStudentsStrip();
+  populateStudentFilter();
+  renderRecords();
+  populatePdfRecordSelect();
+}
+
+// ---------------- Students at a glance ----------------
+function renderStudentsStrip(){
+  const students = users.filter(u => u.role === 'STUDENT');
+  const strip = document.getElementById('studentsStrip');
+  strip.innerHTML = students.map(s => {
+    const count = records.filter(r => r.studentId === s.userId).length;
+    const isActive = activeStudentFilter === s.userId;
+    return `
+      <div class="student-chip ${isActive ? 'active' : ''}" onclick="selectStudent('${s.userId}')">
+        <div class="sid">${s.userId}</div>
+        <div class="sname">${s.displayName}</div>
+        <div class="scount">${count} exam record${count === 1 ? '' : 's'}</div>
+      </div>
+    `;
+  }).join('') || `<div class="empty-row" style="width:100%;">No student accounts yet — add one below.</div>`;
+}
+
+function selectStudent(userId){
+  activeStudentFilter = (activeStudentFilter === userId) ? "" : userId;
+  document.getElementById('studentFilter').value = activeStudentFilter;
+  renderStudentsStrip();
+  renderRecords();
+}
+
+function populateStudentFilter(){
+  const sel = document.getElementById('studentFilter');
+  const students = users.filter(u => u.role === 'STUDENT');
+  sel.innerHTML = '<option value="">All students</option>' +
+    students.map(s => `<option value="${s.userId}">${s.userId} — ${s.displayName}</option>`).join('');
+  sel.value = activeStudentFilter;
+}
+
+function applyFilter(){
+  activeStudentFilter = document.getElementById('studentFilter').value;
+  renderStudentsStrip();
+  renderRecords();
+}
+
+// ---------------- Exam Records ledger (read-only) ----------------
+function visibleRecords(){
+  return activeStudentFilter ? records.filter(r => r.studentId === activeStudentFilter) : records;
+}
+
+function renderRecords(){
+  const ledger = document.getElementById('ledger');
+  const head = ledger.querySelector('.ledger-head');
+  ledger.innerHTML = '';
+  ledger.appendChild(head);
+
+  const list = visibleRecords();
+  if (!list.length){
+    const empty = document.createElement('div');
+    empty.className = 'empty-row';
+    empty.textContent = 'No exam records for this selection.';
+    ledger.appendChild(empty);
+    return;
+  }
+
+  list.forEach((r) => {
+    const i = records.indexOf(r);
+    const appBadge = r.appearanceType === 'Fresher' ? 'badge-fresher' : 'badge-repeater';
+    const statusBadge = r.resultStatus === 'Complete' ? 'badge-complete' : 'badge-incomplete';
+    const row = document.createElement('div');
+    row.className = 'row record-row';
+    row.innerHTML = `
+      <div class="cell sno">${i+1}</div>
+      <div class="cell">
+        <div class="sem-name">${r.semesterName}</div>
+        <div class="meta">${r.academicYear}</div>
+      </div>
+      <div class="cell mono">${r.studentId}</div>
+      <div class="cell">${r.academicYear}</div>
+      <div class="cell mono">${r.examEvent}</div>
+      <div class="cell mono">${r.seatNumber || '—'}</div>
+      <div class="cell"><span class="badge ${appBadge}">${r.appearanceType}</span></div>
+      <div class="cell"><span class="badge ${statusBadge}">${r.resultStatus}</span></div>
+      <div class="cell mono">${r.sgpa || '—'}</div>
+      <div class="cell mono">${r.examFeeAmount || '—'}</div>
+      <div class="cell row-actions">
+        <button class="icon-btn" title="View" onclick="openViewDrawer(${i})">👁</button>
+        <button class="icon-btn" title="Edit" onclick="openEditDrawer(${i})">✎</button>
+        <button class="icon-btn danger" title="Delete" onclick="deleteRecord(${i})">🗑</button>
+      </div>
+    `;
+    ledger.appendChild(row);
+  });
+}
+
+async function deleteRecord(i){
+  const r = records[i];
+  if (!confirm(`Remove "${r.semesterName}" for ${r.studentId}?`)) return;
+  const res = await api(`/api/records/admin/${r.id}`, { method: 'DELETE' });
+  if (res.ok){
+    records.splice(i,1);
+    renderStudentsStrip();
+    renderRecords();
+    populatePdfRecordSelect();
+    showToast('Record removed.');
+  }
+}
+
+// ---------------- View / Edit Drawer ----------------
+function closeDrawer(){
+  document.getElementById('drawerOverlay').classList.remove('show');
+}
+document.getElementById('drawerOverlay').addEventListener('click', e => {
+  if (e.target.id === 'drawerOverlay') closeDrawer();
+});
+
+function parseSubjects(json){
+  try { return JSON.parse(json || '[]'); } catch { return []; }
+}
+
+function openViewDrawer(i){
+  const r = records[i];
+  const subjects = parseSubjects(r.subjectsJson);
+  document.getElementById('drawerEyebrow').textContent = 'VIEWING RECORD';
+  document.getElementById('drawerTitle').textContent = r.semesterName;
+
+  const rows = [
+    ['Student (PRN)', r.studentId], ['Academic Year', r.academicYear],
+    ['Faculty', r.facultyName || '—'], ['Appearance Type', r.appearanceType],
+    ['Exam Event', r.examEvent], ['Form No', r.formNo],
+    ['Exam Fee Amount', r.examFeeAmount], ['Fee Start Date', r.examFeeStartDate],
+    ['Fee End Date', r.examFeeEndDate], ['Inward', r.inward || '—'],
+    ['Seat Number', r.seatNumber], ['Result Status', r.resultStatus],
+    ['SGPA', r.sgpa || '—'],
+  ];
+
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="field-grid">
+      ${rows.map(([label, val]) => `
+        <div class="f-group"><span class="f-label">${label}</span><span class="f-value">${val}</span></div>
+      `).join('')}
+    </div>
+    <div class="f-group span2" style="margin-top:22px;">
+      <span class="f-label">Subjects & Marks</span>
+      <table class="subj-table">
+        <thead><tr><th>Subject</th><th>Marks</th></tr></thead>
+        <tbody>
+          ${subjects.length ? subjects.map(s => `<tr><td>${s[0]}</td><td>${s[1]}</td></tr>`).join('')
+            : `<tr><td colspan="2" class="empty-row">No subjects recorded yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  document.getElementById('drawerFoot').innerHTML = `
+    <button class="pill-btn btn-ghost" onclick="closeDrawer()">Close</button>
+    <button class="primary-btn" onclick="openEditDrawer(${i})">Edit this record</button>
+  `;
+
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+
+let editSubjectsState = [];
+
+function openEditDrawer(i){
+  const r = records[i];
+  editSubjectsState = parseSubjects(r.subjectsJson).map(s => [String(s[0]), String(s[1])]);
+
+  document.getElementById('drawerEyebrow').textContent = 'EDITING RECORD';
+  document.getElementById('drawerTitle').textContent = r.semesterName;
+
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="field-grid">
+      <div class="f-group span2"><span class="f-label">Semester Name</span><input class="f-input" id="f_semesterName" value="${r.semesterName}"></div>
+      <div class="f-group"><span class="f-label">Student (PRN)</span><input class="f-input" id="f_studentId" value="${r.studentId}"></div>
+      <div class="f-group"><span class="f-label">Academic Year</span><input class="f-input" id="f_academicYear" value="${r.academicYear}"></div>
+      <div class="f-group"><span class="f-label">Faculty</span><input class="f-input" id="f_facultyName" value="${r.facultyName || ''}"></div>
+      <div class="f-group">
+        <span class="f-label">Appearance Type</span>
+        <select class="f-select" id="f_appearanceType">
+          <option ${r.appearanceType==='Fresher'?'selected':''}>Fresher</option>
+          <option ${r.appearanceType==='Repeater'?'selected':''}>Repeater</option>
+        </select>
+      </div>
+      <div class="f-group"><span class="f-label">Exam Event</span><input class="f-input" id="f_examEvent" value="${r.examEvent}"></div>
+      <div class="f-group"><span class="f-label">Form No</span><input class="f-input" id="f_formNo" value="${r.formNo}"></div>
+      <div class="f-group"><span class="f-label">Exam Fee Amount</span><input class="f-input" id="f_examFeeAmount" value="${r.examFeeAmount}"></div>
+      <div class="f-group"><span class="f-label">Fee Start Date</span><input class="f-input" id="f_examFeeStartDate" value="${r.examFeeStartDate}"></div>
+      <div class="f-group"><span class="f-label">Fee End Date</span><input class="f-input" id="f_examFeeEndDate" value="${r.examFeeEndDate}"></div>
+      <div class="f-group"><span class="f-label">Inward</span><input class="f-input" id="f_inward" value="${r.inward || ''}"></div>
+      <div class="f-group"><span class="f-label">Seat Number</span><input class="f-input" id="f_seatNumber" value="${r.seatNumber}"></div>
+      <div class="f-group">
+        <span class="f-label">Result Status</span>
+        <select class="f-select" id="f_resultStatus">
+          <option ${r.resultStatus==='Complete'?'selected':''}>Complete</option>
+          <option ${r.resultStatus==='Incomplete'?'selected':''}>Incomplete</option>
+        </select>
+      </div>
+      <div class="f-group"><span class="f-label">SGPA</span><input class="f-input" id="f_sgpa" value="${r.sgpa || ''}"></div>
+    </div>
+
+    <div class="f-group span2" style="margin-top:22px;">
+      <span class="f-label">Subjects & Marks</span>
+      <table class="subj-table" id="subjTable">
+        <thead><tr><th>Subject</th><th>Marks</th><th></th></tr></thead>
+        <tbody id="subjTableBody"></tbody>
+      </table>
+      <button class="link-btn" style="margin-top:8px;" onclick="addSubjectRow()">+ Add subject</button>
+    </div>
+  `;
+
+  renderSubjectRows();
+
+  document.getElementById('drawerFoot').innerHTML = `
+    <button class="pill-btn btn-ghost" onclick="closeDrawer()">Cancel</button>
+    <button class="primary-btn" onclick="saveRecord(${i})">Save Changes</button>
+  `;
+
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+
+function renderSubjectRows(){
+  const body = document.getElementById('subjTableBody');
+  if (!body) return;
+  body.innerHTML = editSubjectsState.map((s, idx) => `
+    <tr>
+      <td><input value="${s[0]}" onchange="editSubjectsState[${idx}][0]=this.value"></td>
+      <td><input value="${s[1]}" onchange="editSubjectsState[${idx}][1]=this.value" style="width:70px;"></td>
+      <td><button class="subj-row-del" onclick="removeSubjectRow(${idx})">✕</button></td>
+    </tr>
+  `).join('') || `<tr><td colspan="3" class="empty-row">No subjects yet — add one below.</td></tr>`;
+}
+function addSubjectRow(){ editSubjectsState.push(['', '']); renderSubjectRows(); }
+function removeSubjectRow(idx){ editSubjectsState.splice(idx,1); renderSubjectRows(); }
+
+async function saveRecord(i){
+  const r = { ...records[i] };
+  const get = id => document.getElementById(id).value.trim();
+  r.semesterName = get('f_semesterName');
+  r.studentId = get('f_studentId');
+  r.academicYear = get('f_academicYear');
+  r.facultyName = get('f_facultyName');
+  r.appearanceType = get('f_appearanceType');
+  r.examEvent = get('f_examEvent');
+  r.formNo = get('f_formNo');
+  r.examFeeAmount = get('f_examFeeAmount');
+  r.examFeeStartDate = get('f_examFeeStartDate');
+  r.examFeeEndDate = get('f_examFeeEndDate');
+  r.inward = get('f_inward');
+  r.seatNumber = get('f_seatNumber');
+  r.resultStatus = get('f_resultStatus');
+  r.sgpa = get('f_sgpa');
+  r.subjectsJson = JSON.stringify(editSubjectsState.filter(s => s[0].trim() !== ''));
+
+  const res = await apiJson(`/api/records/admin/${r.id}`, 'PUT', r);
+  if (res.ok){
+    records[i] = r;
+    closeDrawer();
+    renderStudentsStrip();
+    populateStudentFilter();
+    renderRecords();
+    populatePdfRecordSelect();
+    showToast('Record saved.');
+  } else {
+    showToast('Could not save that change.');
+  }
+}
+
+function openCreateDrawer(){
+  document.getElementById('drawerEyebrow').textContent = 'NEW RECORD';
+  document.getElementById('drawerTitle').textContent = 'Add exam record';
+  editSubjectsState = [];
+
+  document.getElementById('drawerBody').innerHTML = `
+    <div class="field-grid">
+      <div class="f-group span2"><span class="f-label">Semester Name</span><input class="f-input" id="f_semesterName" placeholder="e.g. First Semester of BA-I"></div>
+      <div class="f-group"><span class="f-label">Student (PRN)</span><input class="f-input" id="f_studentId" placeholder="8022041145"></div>
+      <div class="f-group"><span class="f-label">Academic Year</span><input class="f-input" id="f_academicYear" placeholder="2024-2025"></div>
+      <div class="f-group"><span class="f-label">Faculty</span><input class="f-input" id="f_facultyName" value="Faculty of Arts"></div>
+      <div class="f-group">
+        <span class="f-label">Appearance Type</span>
+        <select class="f-select" id="f_appearanceType"><option>Fresher</option><option>Repeater</option></select>
+      </div>
+      <div class="f-group"><span class="f-label">Exam Event</span><input class="f-input" id="f_examEvent" placeholder="May 2026"></div>
+      <div class="f-group"><span class="f-label">Form No</span><input class="f-input" id="f_formNo" placeholder="100000000"></div>
+      <div class="f-group"><span class="f-label">Exam Fee Amount</span><input class="f-input" id="f_examFeeAmount" placeholder="695"></div>
+      <div class="f-group"><span class="f-label">Fee Start Date</span><input class="f-input" id="f_examFeeStartDate" placeholder="DD/MM/YYYY"></div>
+      <div class="f-group"><span class="f-label">Fee End Date</span><input class="f-input" id="f_examFeeEndDate" placeholder="DD/MM/YYYY"></div>
+      <div class="f-group"><span class="f-label">Inward</span><input class="f-input" id="f_inward" value="Inwarded"></div>
+      <div class="f-group"><span class="f-label">Seat Number</span><input class="f-input" id="f_seatNumber" placeholder="—"></div>
+      <div class="f-group">
+        <span class="f-label">Result Status</span>
+        <select class="f-select" id="f_resultStatus"><option>Incomplete</option><option>Complete</option></select>
+      </div>
+      <div class="f-group"><span class="f-label">SGPA</span><input class="f-input" id="f_sgpa" placeholder="—"></div>
+    </div>
+
+    <div class="f-group span2" style="margin-top:22px;">
+      <span class="f-label">Subjects & Marks</span>
+      <table class="subj-table" id="subjTable">
+        <thead><tr><th>Subject</th><th>Marks</th><th></th></tr></thead>
+        <tbody id="subjTableBody"></tbody>
+      </table>
+      <button class="link-btn" style="margin-top:8px;" onclick="addSubjectRow()">+ Add subject</button>
+    </div>
+  `;
+  renderSubjectRows();
+
+  document.getElementById('drawerFoot').innerHTML = `
+    <button class="pill-btn btn-ghost" onclick="closeDrawer()">Cancel</button>
+    <button class="primary-btn" onclick="createRecord()">Create Record</button>
+  `;
+
+  document.getElementById('drawerOverlay').classList.add('show');
+}
+
+async function createRecord(){
+  const get = id => document.getElementById(id).value.trim();
+  const studentId = get('f_studentId');
+  if (!studentId){ showToast('Student ID is required.'); return; }
+
+  const newRecord = {
+    studentId,
+    semesterName: get('f_semesterName') || 'New Semester Record',
+    academicYear: get('f_academicYear') || '—',
+    facultyName: get('f_facultyName') || 'Faculty of Arts',
+    appearanceType: get('f_appearanceType'),
+    examEvent: get('f_examEvent') || 'TBD',
+    formNo: get('f_formNo') || '—',
+    examFeeAmount: get('f_examFeeAmount') || '0',
+    examFeeStartDate: get('f_examFeeStartDate') || '—',
+    examFeeEndDate: get('f_examFeeEndDate') || '—',
+    inward: get('f_inward') || 'Inwarded',
+    seatNumber: get('f_seatNumber') || '—',
+    resultStatus: get('f_resultStatus'),
+    sgpa: get('f_sgpa') || '',
+    subjectsJson: JSON.stringify(editSubjectsState.filter(s => s[0].trim() !== ''))
+  };
+
+  const res = await apiJson('/api/records/admin', 'POST', newRecord);
+  if (res.ok){
+    closeDrawer();
+    // clear any active student filter so the new record is visible immediately,
+    // even if it was added for a different student than the one currently filtered
+    activeStudentFilter = "";
+    await loadAll();
+    showToast('Record created.');
+  } else {
+    showToast('Could not create the record.');
+  }
+}
+
+// ---------------- PDF Library ----------------
+function populatePdfRecordSelect(){
+  const sel = document.getElementById('pdfRecordId');
+  sel.innerHTML = '<option value="">— No linked record —</option>' +
+    records.map(r => `<option value="${r.id}">#${r.id} · ${r.studentId} · ${r.semesterName}</option>`).join('');
+}
+
+async function loadPdfs(){
+  const res = await api('/api/pdfs/admin/all');
+  const docs = await res.json();
+  const body = document.getElementById('pdfTableBody');
+  if (!docs.length){
+    body.innerHTML = `<tr><td colspan="5" class="empty-row">No PDFs uploaded yet.</td></tr>`;
+    return;
+  }
+  body.innerHTML = docs.map(d => `
+    <tr>
+      <td class="mono">${d.studentId}</td>
+      <td>${d.docType}</td>
+      <td>${d.originalFilename}</td>
+      <td class="mono">${(d.uploadedAt || '').replace('T',' ').slice(0,16)}</td>
+      <td>
+        <button class="link-btn" onclick="viewPdf(${d.id})">View</button> ·
+        <button class="link-btn" onclick="replacePdf(${d.id})">Replace</button> ·
+        <button class="link-btn" style="color:var(--bad);" onclick="deletePdf(${d.id})">Remove</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function uploadPdf(){
+  const studentId = document.getElementById('pdfStudentId').value.trim();
+  const recordId = document.getElementById('pdfRecordId').value;
+  const docType = document.getElementById('pdfDocType').value;
+  const fileInput = document.getElementById('pdfFile');
+
+  if (!studentId || !fileInput.files.length){
+    showToast('Enter a student ID and choose a PDF file.');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('studentId', studentId);
+  fd.append('docType', docType);
+  if (recordId) fd.append('recordId', recordId);
+
+  const res = await api('/api/pdfs/upload', { method: 'POST', body: fd });
+  if (res.ok){
+    showToast('PDF uploaded.');
+    fileInput.value = '';
+    document.getElementById('pdfStudentId').value = '';
+    loadPdfs();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showToast(err.error || 'Upload failed.');
+  }
+}
+
+function viewPdf(id){
+  api(`/api/pdfs/${id}/view`).then(res => res.blob()).then(blob => {
+    window.open(URL.createObjectURL(blob), '_blank');
+  });
+}
+
+function replacePdf(id){
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/pdf';
+  input.onchange = async () => {
+    if (!input.files.length) return;
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    const res = await api(`/api/pdfs/${id}/replace`, { method: 'PUT', body: fd });
+    if (res.ok){ showToast('PDF replaced.'); loadPdfs(); }
+    else showToast('Replace failed.');
+  };
+  input.click();
+}
+
+async function deletePdf(id){
+  if (!confirm('Remove this PDF?')) return;
+  const res = await api(`/api/pdfs/${id}/delete`, { method: 'DELETE' });
+  if (res.ok){ showToast('PDF removed.'); loadPdfs(); }
+}
+
+// ---------------- User Accounts ----------------
+async function loadUsers(){
+  const res = await api('/api/users');
+  users = await res.json();
+  const body = document.getElementById('userTableBody');
+  body.innerHTML = users.map(u => `
+    <tr>
+      <td class="mono">${u.userId}</td>
+      <td>${u.displayName}</td>
+      <td><span class="badge badge-${u.role.toLowerCase()}">${u.role}</span></td>
+      <td><button class="link-btn" style="color:var(--bad);" onclick="deleteUser('${u.userId}')">Remove</button></td>
+    </tr>
+  `).join('');
+  renderStudentsStrip();
+  populateStudentFilter();
+}
+
+async function createUser(){
+  const body = {
+    userId: document.getElementById('newUserId').value.trim(),
+    displayName: document.getElementById('newUserName').value.trim(),
+    password: document.getElementById('newUserPass').value,
+    role: document.getElementById('newUserRole').value
+  };
+  if (!body.userId || !body.displayName || !body.password){
+    showToast('Fill in ID, name and password.');
+    return;
+  }
+  const res = await apiJson('/api/users', 'POST', body);
+  if (res.ok){
+    showToast('User created.');
+    document.getElementById('newUserId').value = '';
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserPass').value = '';
+    loadUsers();
+  } else {
+    const err = await res.json().catch(() => ({}));
+    showToast(err.error || 'Could not create user.');
+  }
+}
+
+async function deleteUser(userId){
+  if (!confirm(`Remove user ${userId}?`)) return;
+  const res = await api(`/api/users/${userId}`, { method: 'DELETE' });
+  if (res.ok){ showToast('User removed.'); loadUsers(); }
+}
+
+(async function init(){
+  await loadAll();
+  await loadPdfs();
+})();
+</script>
+
+</body>
+</html>
